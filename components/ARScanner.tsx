@@ -8,12 +8,14 @@ import MeasurementBox from './MeasurementBox';
 const ARScanner = () => {
   const [model, setModel] = useState<any>(null);
   const [predictions, setPredictions] = useState<any[]>([]);
+  const [outputJSON, setOutputJSON] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Load model and start camera on initial load
   useEffect(() => {
     const init = async () => {
+      await tf.setBackend('webgl');
+      await tf.ready();
       const loadedModel = await loadModel();
       setModel(loadedModel);
       startCamera();
@@ -21,7 +23,6 @@ const ARScanner = () => {
     init();
   }, []);
 
-  // Start camera stream
   const startCamera = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     if (videoRef.current) {
@@ -29,35 +30,67 @@ const ARScanner = () => {
     }
   };
 
-  // Process each video frame
   const handleVideoFrame = async () => {
-    if (!videoRef.current || !model) return;
+    if (!videoRef.current  !model  !canvasRef.current) return;
 
-    const videoFrame = videoRef.current;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
 
-    // Convert video frame to tensor
-    let tensor = tf.browser.fromPixels(videoFrame);
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      requestAnimationFrame(handleVideoFrame);
+      return;
+    }
 
-    // Resize to model input shape: [224, 224, 3]
-    tensor = tf.image.resizeBilinear(tensor, [224, 224]);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) return;
 
-    // Normalize: scale pixel values to [0, 1]
-    tensor = tensor.div(255.0);
+    const detectedRadiators = tf.tidy(() => {
+      let tensor = tf.browser.fromPixels(video);
+      tensor = tf.image.resizeBilinear(tensor, [224, 224]);
+      tensor = tensor.div(255.0).expandDims(0);
+      return tensor;
+    });
 
-    // Expand to batch size of 1: [224, 224, 3] → [1, 224, 224, 3]
-    tensor = tensor.expandDims(0);
+    try {
+      const radiators = await detectRadiator(model, detectedRadiators);
+      console.log("Detected Radiators:", radiators);
+      detectedRadiators.dispose();
 
-    // Run inference
-    const detectedRadiators = await detectRadiator(model, tensor);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Update predictions
-    setPredictions(detectedRadiators);
+      radiators.forEach((prediction: any) => {
+        if (prediction.class === 'radiator') {
+          const [x, y, w, h] = prediction.bbox;
 
-    // Continue processing frames
+          context.beginPath();
+          context.rect(x, y, w, h);
+          context.lineWidth = 2;
+          context.strokeStyle = 'red';
+          context.stroke();
+
+          context.fillStyle = 'red';
+          context.font = '16px Arial';
+          context.fillText(
+            ${prediction.class} (${Math.round(prediction.score * 100)}%),
+            x,
+            y - 8
+          );
+        }
+      });
+
+      setPredictions(radiators);
+      setOutputJSON(JSON.stringify(radiators, null, 2));
+
+    } catch (error) {
+      console.error('Error during detection:', error);
+    }
+
     requestAnimationFrame(handleVideoFrame);
   };
 
-  // Initialize video frame handler once model is ready
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.onloadeddata = handleVideoFrame;
@@ -70,6 +103,23 @@ const ARScanner = () => {
       <canvas ref={canvasRef} className="canvas-overlay" />
       <CalibrationOverlay predictions={predictions} />
       <MeasurementBox predictions={predictions} />
+
+      <pre
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          color: 'lime',
+          fontSize: '12px',
+          padding: '10px',
+          maxHeight: '200px',
+          overflow: 'auto',
+          width: '100%',
+        }}
+      >
+        {outputJSON}
+      </pre>
     </div>
   );
 };
