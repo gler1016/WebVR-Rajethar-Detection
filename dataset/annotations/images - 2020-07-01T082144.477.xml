@@ -1,0 +1,26 @@
+<annotation>
+	<folder>Radiator</folder>
+	<filename>images - 2020-07-01T082144.477.jpg</filename>
+	<path>\\drive\SID\PRIVADO\1-PROYECTOS\EeB2-2018 BIM-SPEED\Images\Radiator\images - 2020-07-01T082144.477.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>300</width>
+		<height>168</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Radiator</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>155</xmin>
+			<ymin>12</ymin>
+			<xmax>291</xmax>
+			<ymax>126</ymax>
+		</bndbox>
+	</object>
+</annotation>

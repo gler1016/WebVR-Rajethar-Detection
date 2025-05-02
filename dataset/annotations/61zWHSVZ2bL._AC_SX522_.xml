@@ -1,0 +1,26 @@
+<annotation>
+	<folder>Radiator</folder>
+	<filename>61zWHSVZ2bL._AC_SX522_.jpg</filename>
+	<path>\\drive\SID\PRIVADO\1-PROYECTOS\EeB2-2018 BIM-SPEED\Images\Radiator\61zWHSVZ2bL._AC_SX522_.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>522</width>
+		<height>560</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Radiator</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>69</xmin>
+			<ymin>6</ymin>
+			<xmax>520</xmax>
+			<ymax>545</ymax>
+		</bndbox>
+	</object>
+</annotation>

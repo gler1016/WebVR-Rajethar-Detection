@@ -1,0 +1,26 @@
+<annotation>
+	<folder>Radiator</folder>
+	<filename>descarga (8).jpg</filename>
+	<path>\\drive\SID\PRIVADO\1-PROYECTOS\EeB2-2018 BIM-SPEED\Images\Radiator\descarga (8).jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>225</width>
+		<height>225</height>
+		<depth>1</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Radiator</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>42</xmin>
+			<ymin>7</ymin>
+			<xmax>182</xmax>
+			<ymax>197</ymax>
+		</bndbox>
+	</object>
+</annotation>

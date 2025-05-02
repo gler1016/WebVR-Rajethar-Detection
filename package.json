@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "dev": "next dev"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^3.0.0",
+    "@tensorflow/tfjs-converter": "^3.0.0",
+    "next": "12.x",
+    "react": "17.x",
+    "react-dom": "17.x"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.2",
+    "typescript": "5.8.3"
+  }
+}

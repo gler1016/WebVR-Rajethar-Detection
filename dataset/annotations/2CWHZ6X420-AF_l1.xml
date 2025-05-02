@@ -1,0 +1,26 @@
+<annotation>
+	<folder>Radiator</folder>
+	<filename>2CWHZ6X420-AF_l1.jpg</filename>
+	<path>\\drive\SID\PRIVADO\1-PROYECTOS\EeB2-2018 BIM-SPEED\Images\Radiator\2CWHZ6X420-AF_l1.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>1000</width>
+		<height>1000</height>
+		<depth>1</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Radiator</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>184</xmin>
+			<ymin>33</ymin>
+			<xmax>823</xmax>
+			<ymax>846</ymax>
+		</bndbox>
+	</object>
+</annotation>
