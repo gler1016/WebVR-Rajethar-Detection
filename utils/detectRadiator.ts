@@ -1,11 +1,38 @@
 import * as tf from '@tensorflow/tfjs';
 
 export async function detectRadiator(model: any, imageTensor: tf.Tensor) {
-  const predictions = await model.executeAsync(imageTensor) as tf.Tensor[];
-  const boundingBoxes = predictions[0].arraySync();
-  const classLabels = predictions[1].arraySync();
+  // Run inference
+  const predictions = model.execute(imageTensor) as tf.Tensor[];
 
-  const radiators = boundingBoxes.filter((box: any, idx: number) => classLabels[idx] === 1); // Assuming "Radiator" class is 1
+  // Unpack tensors
+  const [boxesTensor, classesTensor, scoresTensor] = predictions;
 
-  return radiators;
+  // Convert tensors to arrays
+  const boxes = await boxesTensor.array() as number[][];     // shape: [numDetections, 4]
+  const classes = await classesTensor.array() as number[];    // shape: [numDetections]
+  const scores = scoresTensor ? await scoresTensor.array() as number[] : undefined; // optional: confidence scores
+
+  // Ensure that boxes, classes, and scores are arrays
+  const results: any[] = [];
+
+  if (Array.isArray(boxes) && Array.isArray(classes)) {
+    for (let i = 0; i < boxes.length; i++) {
+      const classId = classes[i];
+      const score = scores ? scores[i] : 1.0;
+
+      // Filter only radiators with confidence > threshold (e.g., 0.5)
+      if (classId === 1 && score > 0.5) {
+        results.push({
+          class: 'radiator',
+          bbox: boxes[i],  // [x, y, width, height]
+          score,
+        });
+      }
+    }
+  }
+
+  // Clean up
+  tf.dispose([boxesTensor, classesTensor, scoresTensor]);
+
+  return results;
 }
