@@ -1,11 +1,9 @@
 // next.config.js
-
 module.exports = {
-  reactStrictMode: true,
-  webpack: (config) => {
+  webpack(config) {
     config.module.rules.push({
-      test: /\.tflite$/,
-      use: 'file-loader',
+      test: /\.bin$/,
+      use: 'file-loader', // Ensure .bin files are served as static assets
     });
     return config;
   },
