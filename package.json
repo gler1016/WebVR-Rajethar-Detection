@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "dev": "next dev"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.0.0",
@@ -10,7 +12,6 @@
     "react-dom": "17.x"
   },
   "devDependencies": {
-    "@types/react": "19.1.2",
     "typescript": "5.8.3"
   }
 }
