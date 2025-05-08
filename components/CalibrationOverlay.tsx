@@ -1,28 +1,11 @@
-// components/CalibrationOverlay.tsx
-
 import React from 'react';
 
-const CalibrationOverlay = ({ predictions }: { predictions: any[] }) => {
-  if (predictions.length === 0) {
-    return <div className="calibration-instructions">Place a known object for calibration</div>;
-  }
-
+const CalibrationOverlay: React.FC = () => {
   return (
-    <div className="calibration-overlay">
-      {predictions.map((prediction, index) => (
-        <div
-          key={index}
-          className="bounding-box"
-          style={{
-            left: `${prediction[0]}px`,
-            top: `${prediction[1]}px`,
-            width: `${prediction[2] - prediction[0]}px`,
-            height: `${prediction[3] - prediction[1]}px`,
-          }}
-        />
-      ))}
+    <div className="mt-4 p-2 bg-yellow-100 text-yellow-800 rounded shadow">
+      Calibration Overlay (Reference object calibration prompt/status)
     </div>
   );
 };
 
-export default CalibrationOverlay;
+export default CalibrationOverlay; 
