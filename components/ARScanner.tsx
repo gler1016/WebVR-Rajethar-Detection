@@ -1,229 +1,123 @@
+'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import * as tf from '@tensorflow/tfjs';
-import { loadModel } from '../utils/loadModel';
-import { detectRadiator } from '../utils/detectRadiator';
-import CalibrationOverlay from './CalibrationOverlay';
-import MeasurementBox from './MeasurementBox';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
+import '@tensorflow/tfjs';
 
-const ARScanner = () => {
-  const [model, setModel] = useState<any>(null);
-  const [predictions, setPredictions] = useState<any[]>([]);
-  const [calibrationStep, setCalibrationStep] = useState<number>(0); // 0: Start, 1: Calibration complete, 2: Measuring
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+const ARScanner: React.FC = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load model and start camera
+  // Load TensorFlow.js COCO-SSD model
   useEffect(() => {
-    const init = async () => {
-      await tf.setBackend('webgl');
-      await tf.ready();
-      const loadedModel = await loadModel();
-      setModel(loadedModel);
-      startCamera();
-    };
-    init();
+    cocoSsd.load().then(setModel).catch(() => setError('Failed to load detection model'));
   }, []);
 
-  // Start webcam stream
-  const startCamera = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480 }
-    });
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
-  };
-  
-  // Handle each video frame for detection
-  const handleVideoFrame = async () => {
-    if (!videoRef.current || !model || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      requestAnimationFrame(handleVideoFrame);
-      return;
-    }
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    const inputTensor = tf.tidy(() => {
-      let tensor = tf.browser.fromPixels(video);
-      tensor = tf.image.resizeBilinear(tensor, [640, 640]);
-      tensor = tensor.toFloat().div(255.0);
-      tensor = tensor.transpose([2, 0, 1]);
-      tensor = tensor.expandDims(0);  
-      return tensor;
-    });
-
-    try {
-      const results = await detectRadiator(model, inputTensor);
-      inputTensor.dispose();
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      setPredictions(results);
-
-      // Update calibration step based on results
-      if (results.length > 0 && calibrationStep === 0) {
-        setCalibrationStep(1); // Calibration complete
-      }
-    } catch (err) {
-      console.error('Detection error:', err);
-    }
-
-    requestAnimationFrame(handleVideoFrame);
-  };
-
-  // Begin detection loop once video is ready
+  // Camera setup
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.onloadeddata = handleVideoFrame;
-    }
+    const getCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        setError('Camera access denied or not available.');
+      }
+    };
+    getCamera();
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // Detection loop
+  useEffect(() => {
+    let animationId: number;
+    let isMounted = true;
+    const detectFrame = async () => {
+      if (!model || !videoRef.current || !canvasRef.current) {
+        setLoading(true);
+        animationId = requestAnimationFrame(detectFrame);
+        return;
+      }
+      setLoading(false);
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (video.readyState === 4) {
+        const predictions = await model.detect(video);
+        // Find radiator-like objects (COCO-SSD may not have a radiator class, so use 'radiator' or fallback to 'bench', 'tv', etc. for demo)
+        const radiatorPreds = predictions.filter(pred =>
+          pred.class.toLowerCase().includes('radiator') ||
+          pred.class.toLowerCase().includes('bench') ||
+          pred.class.toLowerCase().includes('tv')
+        );
+        radiatorPreds.forEach(pred => {
+          // Draw orange outline
+          ctx.save();
+          ctx.strokeStyle = 'orange';
+          ctx.lineWidth = 4;
+          ctx.setLineDash([8, 8]);
+          ctx.beginPath();
+          ctx.rect(...pred.bbox);
+          ctx.stroke();
+          ctx.restore();
+          // Draw label
+          ctx.save();
+          ctx.font = '18px Arial';
+          ctx.fillStyle = 'orange';
+          ctx.fillText('Radiator?', pred.bbox[0], pred.bbox[1] - 8);
+          ctx.restore();
+        });
+      }
+      animationId = requestAnimationFrame(detectFrame);
+    };
+    animationId = requestAnimationFrame(detectFrame);
+    return () => {
+      isMounted = false;
+      cancelAnimationFrame(animationId);
+    };
   }, [model]);
 
-  // Handle image upload
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setImageSrc(imageUrl);
-      if (videoRef.current) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        const tracks = stream?.getTracks();
-        tracks?.forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-      }
-      const image = new Image();
-      image.src = imageUrl;
-      image.onload = async () => {
-        if (!canvasRef.current || !model) return;
-
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        if (!context) return;
-
-        canvas.width = image.width;
-        canvas.height = image.height;
-        context.drawImage(image, 0, 0);
-
-        const inputTensor = tf.tidy(() => {
-          let tensor = tf.browser.fromPixels(image);
-          tensor = tf.image.resizeBilinear(tensor, [640, 640]);
-          tensor = tensor.toFloat().div(255.0);
-          tensor = tensor.transpose([2, 0, 1]); // Change shape from [640, 640, 3] to [3, 640, 640]
-          tensor = tensor.expandDims(0);       // Add batch dimension -> [1, 3, 640, 640]
-          
-          return tensor;
-        });
-
-        try {
-          const results = await detectRadiator(model, inputTensor);
-          inputTensor.dispose();
-          setPredictions(results);
-
-          // Update calibration step based on results
-          if (results.length > 0 && calibrationStep === 0) {
-            setCalibrationStep(1); // Calibration complete
-          }
-        } catch (err) {
-          console.error('Detection error:', err);
-        }
-      };
-    }
-  };
-
-  // Download prediction results as JSON
-  const downloadPredictionsAsJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(predictions, null, 2));
-    const anchor = document.createElement("a");
-    anchor.setAttribute("href", dataStr);
-    anchor.setAttribute("download", "radiator_predictions.json");
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-  };
-
-  // Calibration instruction text
-  const renderCalibrationMessage = () => {
-    if (calibrationStep === 0) return "Please position the object for calibration.";
-    if (calibrationStep === 1) return "Calibration complete! Start measuring.";
-    if (calibrationStep === 2) return "Start measuring with the calibrated object.";
-    return "Calibration error.";
-  };
-
-  // Draw bounding boxes on canvas
-  const drawBoundingBoxes = () => {
-    if (!canvasRef.current || !predictions.length) return;
-
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    predictions.forEach(prediction => {
-      if (prediction.class === 'radiator') {
-        const [x, y, width, height] = prediction.bbox;
-        const scaleX = canvas.width / videoRef.current?.videoWidth!;
-        const scaleY = canvas.height / videoRef.current?.videoHeight!;
-        
-        context.strokeStyle = '#FF0000';
-        context.lineWidth = 2;
-        context.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
-        context.fillStyle = '#FF0000';
-        context.fillText(
-          `Radiator (${Math.round(prediction.score * 100)}%)`,
-          x * scaleX,
-          y * scaleY - 5
-        );
-      }
-    });
-  };
-
-  // Call this method when predictions are updated
-  useEffect(() => {
-    drawBoundingBoxes();
-  }, [predictions]);
-
   return (
-    <div className="scanner-container">
-      {/* Image upload input */}
-      <input 
-        type="file" 
-        accept="image/*" 
-        ref={fileInputRef} 
-        onChange={handleImageUpload} 
-        style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 10 }}
+    <div className="relative w-full max-w-2xl h-96 bg-black rounded-lg overflow-hidden flex items-center justify-center">
+      <video
+        ref={videoRef}
+        className="absolute w-full h-full object-cover"
+        autoPlay
+        playsInline
+        muted
+        width={640}
+        height={384}
       />
-      
-      {imageSrc && <img src={imageSrc} alt="Uploaded Image" style={{ display: 'none' }} />}
-      
-      {/* Video feed for webcam or uploaded image */}
-      {!imageSrc && <video ref={videoRef} autoPlay playsInline className="camera-feed" />}
-      <canvas ref={canvasRef} className="canvas-overlay" />
-
-      {/* Calibration Overlay Message */}
-      <div className="calibration-overlay">
-        <div className="calibration-instructions">
-          {renderCalibrationMessage()}
+      <canvas
+        ref={canvasRef}
+        width={640}
+        height={384}
+        className="absolute w-full h-full pointer-events-none"
+      />
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 text-white text-lg font-semibold z-10">
+          Loading AR Scanner...
         </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-red-700 bg-opacity-80 text-white text-lg font-semibold z-20">
+          {error}
+        </div>
+      )}
+      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+        Point your camera at the radiator and reference card
       </div>
-
-      {/* Optional Overlays */}
-      <CalibrationOverlay predictions={predictions} />
-      <MeasurementBox predictions={predictions} />
-
-      {/* JSON Export Button */}
-      <button onClick={downloadPredictionsAsJSON} className="download-btn">
-        Download Bounding Boxes (JSON)
-      </button>
     </div>
   );
 };
 
-export default ARScanner;
+export default ARScanner; 
